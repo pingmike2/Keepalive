@@ -1,94 +1,100 @@
-#!/bin/sh
-set -e
+#!/bin/bash
 
-# 环境变量配置
-PORT=${PORT:-16805}
-USERNAME=${USERNAME:-user}
-PASSWORD=${PASSWORD:-pass}
+# socks5.sh - 安装或卸载 sing-box socks5 服务
+# 使用方式：
+# 安装：PORT=16805 USERNAME=oneforall PASSWORD=allforone bash <(curl -Ls https://your-url.com/socks5.sh)
+# 卸载：bash <(curl -Ls https://your-url.com/socks5.sh) uninstall
 
-WORK_DIR="/etc/sing-box"
-BIN_DIR="/usr/local/bin"
+INSTALL_DIR="/usr/local/sb"
+CONFIG_FILE="$INSTALL_DIR/config.json"
+BIN_FILE="$INSTALL_DIR/sing-box"
+LOG_FILE="$INSTALL_DIR/run.log"
+PID_FILE="$INSTALL_DIR/sb.pid"
 
 # 卸载逻辑
-if [ "$1" = "uninstall" ]; then
-  echo "[卸载] 停止并移除 sing-box..."
-  if [ -f /etc/init.d/sing-box ]; then
-    rc-service sing-box stop
-    rc-update del sing-box
-    rm -f /etc/init.d/sing-box
-  fi
-  rm -rf "$WORK_DIR" "$BIN_DIR/sing-box"
-  echo "✅ 卸载完成"
+if [[ "$1" == "uninstall" ]]; then
+  echo "[INFO] 正在停止 socks5 服务..."
+  pkill -f "sing-box run" >/dev/null 2>&1
+  [[ -f "$PID_FILE" ]] && kill "$(cat "$PID_FILE")" >/dev/null 2>&1
+  echo "[INFO] 删除文件..."
+  rm -rf "$INSTALL_DIR"
+  echo "✅ socks5 卸载完成。"
   exit 0
 fi
 
-# 安装依赖
-if command -v apk >/dev/null; then
-  apk update && apk add curl tar
-elif command -v apt >/dev/null; then
-  apt update && apt install -y curl tar
-elif command -v yum >/dev/null; then
-  yum install -y curl tar
-else
-  echo "❌ 不支持的系统"
+# 检查变量
+if [[ -z "$PORT" || -z "$USERNAME" || -z "$PASSWORD" ]]; then
+  echo "[ERROR] 必须设置 PORT、USERNAME、PASSWORD 变量，例如："
+  echo "PORT=16805 USERNAME=oneforall PASSWORD=allforone bash <(curl -Ls https://your-url.com/socks5.sh)"
   exit 1
 fi
 
-# 下载 sing-box 最新版本
-mkdir -p "$WORK_DIR"
-echo "[INFO] 获取 sing-box 最新 release..."
-RELEASE_URL="https://api.github.com/repos/SagerNet/sing-box/releases/latest"
-DOWNLOAD_URL=$(curl -s "$RELEASE_URL" \
-  | grep browser_download_url \
-  | grep linux-amd64.tar.gz \
-  | cut -d '"' -f 4)
+# 获取公网 IP
+IP=$(curl -s ipv4.ip.sb || curl -s ifconfig.me)
 
-if [ -z "$DOWNLOAD_URL" ]; then
-  echo "❌ 无法获取下载 URL"
-  exit 1
+# 安装依赖（适配多种系统）
+if command -v apk >/dev/null 2>&1; then
+  apk update && apk add curl tar unzip
+elif command -v apt >/dev/null 2>&1; then
+  apt update && apt install -y curl tar unzip
+elif command -v yum >/dev/null 2>&1; then
+  yum install -y curl tar unzip
 fi
 
-echo "[INFO] 下载 sing-box：$DOWNLOAD_URL"
-curl -L -o /tmp/sb.tar.gz "$DOWNLOAD_URL"
+# 创建工作目录
+mkdir -p "$INSTALL_DIR"
+cd "$INSTALL_DIR" || exit 1
 
-# 解压并安装
-tar -xzf /tmp/sb.tar.gz -C /tmp
-cp /tmp/sing-box-*-linux-amd64/sing-box "$BIN_DIR/"
-chmod +x "$BIN_DIR/sing-box"
+# 下载 sing-box（自动识别架构）
+ARCH=$(uname -m)
+case "$ARCH" in
+  x86_64) ARCH_TYPE=amd64 ;;
+  aarch64 | arm64) ARCH_TYPE=arm64 ;;
+  *) echo "[ERROR] 不支持的架构: $ARCH"; exit 1 ;;
+esac
 
-# 写入配置
-mkdir -p "$WORK_DIR"
-cat > "$WORK_DIR/config.json" <<EOF
+SB_VER=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest | grep tag_name | cut -d '"' -f4)
+curl -Lo sb.tar.gz "https://github.com/SagerNet/sing-box/releases/download/${SB_VER}/sing-box-${SB_VER}-linux-${ARCH_TYPE}.tar.gz"
+tar -xzf sb.tar.gz --strip-components=1
+chmod +x sing-box
+rm -f sb.tar.gz
+
+# 生成配置文件
+cat > "$CONFIG_FILE" <<EOF
 {
-  "log": { "level": "info" },
-  "inbounds": [
-    {
-      "type": "socks",
-      "listen": "0.0.0.0",
-      "listen_port": $PORT,
-      "users": [{ "username": "$USERNAME", "password": "$PASSWORD" }]
-    }
-  ],
-  "outbounds": [{ "type": "direct" }]
+  "log": {
+    "level": "info"
+  },
+  "inbounds": [{
+    "type": "socks",
+    "tag": "socks-in",
+    "listen": "0.0.0.0",
+    "listen_port": $PORT,
+    "authentication": "password",
+    "users": [{
+      "username": "$USERNAME",
+      "password": "$PASSWORD"
+    }]
+  }],
+  "outbounds": [{
+    "type": "direct"
+  }]
 }
 EOF
 
-# 配置 OpenRC
-if [ -f /etc/init.d/sing-box ] || [ -f /etc/alpine-release ]; then
-  cat > /etc/init.d/sing-box <<'RC'
-#!/sbin/openrc-run
-description="sing-box socks5 service"
-command="/usr/local/bin/sing-box"
-command_args="run -c /etc/sing-box/config.json"
-RC
-  chmod +x /etc/init.d/sing-box
-  rc-update add sing-box default
-  rc-service sing-box restart
-fi
+# 启动服务
+echo "[INFO] 启动 socks5 服务..."
+nohup "$BIN_FILE" run -c "$CONFIG_FILE" > "$LOG_FILE" 2>&1 &
+echo $! > "$PID_FILE"
 
-# 输出运行信息
-IP=$(curl -s https://api.ipify.org || hostname -i | awk '{print $1}')
-echo
-echo "✅ 安装完成，Socks5 正常启动！"
-echo "🔗 复制并使用连接字符串："
-echo "socks5://$USERNAME:$PASSWORD@$IP:$PORT"
+# 检查是否启动成功
+sleep 2
+if pgrep -f "sing-box run" >/dev/null; then
+  echo
+  echo "✅ Socks5 启动成功："
+  echo "socks5://$USERNAME:$PASSWORD@$IP:$PORT"
+else
+  echo "❌ Socks5 启动失败，日志如下："
+  tail -n 20 "$LOG_FILE"
+  exit 1
+fi
