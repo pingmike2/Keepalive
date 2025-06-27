@@ -1,11 +1,11 @@
 #!/bin/sh
 
-# 默认配置（如未传入环境变量则使用这些）
-PORT=${PORT:-10808}
+# ==== 可通过环境变量自定义 ====
+PORT=${PORT:-16805}
 USERNAME=${USERNAME:-"user"}
 PASSWORD=${PASSWORD:-"pass"}
 
-# 检查系统类型
+# 检查系统类型并安装依赖
 if [ -f /etc/alpine-release ]; then
   echo "[INFO] 检测到 Alpine 系统，安装依赖中..."
   apk update && apk add curl tar
@@ -51,9 +51,9 @@ cat > /etc/sing-box/config.json <<EOF
 }
 EOF
 
-# 启动服务
+# 配置 OpenRC 启动服务（Alpine）
 if [ -f /etc/alpine-release ]; then
-  echo "[INFO] 使用 OpenRC 启动 sing-box..."
+  echo "[INFO] 安装 OpenRC 服务..."
   cat > /etc/init.d/sing-box <<'RC'
 #!/sbin/openrc-run
 description="sing-box socks5 service"
@@ -61,32 +61,13 @@ command=/usr/local/bin/sing-box
 command_args="run -c /etc/sing-box/config.json"
 RC
   chmod +x /etc/init.d/sing-box
-  rc-update add sing-box
-  rc-service sing-box restart
-else
-  echo "[INFO] 使用 systemd 启动 sing-box..."
-  cat > /etc/systemd/system/sing-box.service <<EOF
-[Unit]
-Description=Sing-box Socks5 Service
-After=network.target
-
-[Service]
-ExecStart=/usr/local/bin/sing-box run -c /etc/sing-box/config.json
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-  systemctl daemon-reexec
-  systemctl daemon-reload
-  systemctl enable sing-box
-  systemctl restart sing-box
+  rc-update add sing-box default
 fi
 
-# 输出提示
-echo "✅ Socks5 启动成功"
-echo "📌 IP地址：你的服务器公网 IP"
-echo "📌 端口：$PORT"
-echo "📌 用户名：$USERNAME"
-echo "📌 密码：$PASSWORD"
+# 输出连接信息
+IP=$(curl -s https://api.ip.sb/ip || hostname -i | awk '{print $1}')
+echo "✅ 配置已完成，你可以手动运行以下命令启动 Socks5："
+echo "   rc-service sing-box start"
+echo
+echo "🌐 连接链接如下（推荐复制使用）："
+echo "socks5://$USERNAME:$PASSWORD@$IP:$PORT"
