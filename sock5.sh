@@ -2,8 +2,10 @@
 
 # sing-box socks5 安装/卸载脚本
 # 用法：
-# 安装：PORT=16805 USERNAME=oneforall PASSWORD=allforone bash <(curl -Ls https://raw.githubusercontent.com/pingmike2/Keepalive/main/sock5.sh)
-# 卸载：bash <(curl -Ls https://raw.githubusercontent.com/pingmike2/Keepalive/main/sock5.sh) uninstall
+# 安装：
+#   PORT=16805 USERNAME=oneforall PASSWORD=allforone bash <(curl -Ls https://raw.githubusercontent.com/pingmike2/Keepalive/main/sock5.sh)
+# 卸载：
+#   bash <(curl -Ls https://raw.githubusercontent.com/pingmike2/Keepalive/main/sock5.sh) uninstall
 
 set -euo pipefail
 
@@ -105,8 +107,8 @@ cat > "$CONFIG_FILE" <<EOF
     "listen": "0.0.0.0",
     "listen_port": $PORT,
     "users": [{
-      "user": "$USERNAME",
-      "pass": "$PASSWORD"
+      "username": "$USERNAME",
+      "password": "$PASSWORD"
     }]
   }],
   "outbounds": [{
@@ -120,7 +122,6 @@ echo "[INFO] 启动 socks5 服务..."
 nohup "$BIN_FILE" run -c "$CONFIG_FILE" > "$LOG_FILE" 2>&1 &
 echo $! > "$PID_FILE"
 
-# 等待几秒检测端口监听
 sleep 4
 
 # ===== 检查端口监听 =====
