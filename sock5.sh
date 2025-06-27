@@ -5,6 +5,30 @@ PORT=${PORT:-16805}
 USERNAME=${USERNAME:-"user"}
 PASSWORD=${PASSWORD:-"pass"}
 
+# ==== 卸载逻辑 ====
+if [ "$1" = "uninstall" ]; then
+  echo "[卸载] 停止并移除 sing-box..."
+  if [ -f /etc/init.d/sing-box ]; then
+    rc-service sing-box stop
+    rc-update del sing-box
+    rm -f /etc/init.d/sing-box
+  fi
+
+  if [ -f /etc/systemd/system/sing-box.service ]; then
+    systemctl stop sing-box
+    systemctl disable sing-box
+    rm -f /etc/systemd/system/sing-box.service
+    systemctl daemon-reload
+  fi
+
+  rm -rf /etc/sing-box
+  rm -f /usr/local/bin/sing-box
+  echo "✅ 卸载完成"
+  exit 0
+fi
+
+# ==== 安装逻辑 ====
+
 # 检查系统类型并安装依赖
 if [ -f /etc/alpine-release ]; then
   echo "[INFO] 检测到 Alpine 系统，安装依赖中..."
@@ -51,7 +75,7 @@ cat > /etc/sing-box/config.json <<EOF
 }
 EOF
 
-# 配置 OpenRC 启动服务（Alpine）
+# 配置 OpenRC 服务
 if [ -f /etc/alpine-release ]; then
   echo "[INFO] 安装 OpenRC 服务..."
   cat > /etc/init.d/sing-box <<'RC'
