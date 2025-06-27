@@ -1,55 +1,62 @@
-#!/bin/sh
+#!/bin/bash
 
-# ==== 可通过环境变量自定义 ====
-PORT=${PORT:-16805}
-USERNAME=${USERNAME:-"user"}
-PASSWORD=${PASSWORD:-"pass"}
+# 配色函数
+red() { echo -e "\033[31m$1\033[0m"; }
+green() { echo -e "\033[32m$1\033[0m"; }
+purple() { echo -e "\033[35m$1\033[0m"; }
 
-# ==== 卸载逻辑 ====
-if [ "$1" = "uninstall" ]; then
-  echo "[卸载] 停止并移除 sing-box..."
-  if [ -f /etc/init.d/sing-box ]; then
-    rc-service sing-box stop
-    rc-update del sing-box
-    rm -f /etc/init.d/sing-box
+# 变量
+work_dir="/usr/local/sb"
+server_name="sing-box"
+PORT=16805
+USERNAME="oneforall"
+PASSWORD="allforone"
+
+# 检查是否为 root 用户
+[[ $EUID -ne 0 ]] && red "请使用 root 用户运行此脚本！" && exit 1
+
+# 获取真实 IP（优先返回非 Cloudflare 的 IPv4，否则返回 IPv6）
+get_realip() {
+  ip=$(curl -s --max-time 2 ipv4.ip.sb)
+  if [ -z "$ip" ]; then
+    ipv6=$(curl -s --max-time 1 ipv6.ip.sb)
+    echo "[$ipv6]"
+  else
+    if curl -s http://ipinfo.io/org | grep -qE 'Cloudflare|UnReal|AEZA|Andrei'; then
+      ipv6=$(curl -s --max-time 1 ipv6.ip.sb)
+      echo "[$ipv6]"
+    else
+      echo "$ip"
+    fi
   fi
+}
 
-  if [ -f /etc/systemd/system/sing-box.service ]; then
-    systemctl stop sing-box
-    systemctl disable sing-box
-    rm -f /etc/systemd/system/sing-box.service
-    systemctl daemon-reload
-  fi
+# 下载并安装 sing-box 和 cloudflared
+install_singbox() {
+  clear
+  purple "正在安装 sing-box 和 cloudflared 中，请稍后..."
 
-  rm -rf /etc/sing-box
-  rm -f /usr/local/bin/sing-box
-  echo "✅ 卸载完成"
-  exit 0
-fi
+  ARCH_RAW=$(uname -m)
+  case "$ARCH_RAW" in
+    x86_64) ARCH="amd64" ;;
+    i386 | i686 | x86) ARCH="386" ;;
+    aarch64 | arm64) ARCH="arm64" ;;
+    armv7l) ARCH="armv7" ;;
+    s390x) ARCH="s390x" ;;
+    *) red "不支持的架构: $ARCH_RAW" && exit 1 ;;
+  esac
 
-# ==== 安装逻辑 ====
+  mkdir -p "$work_dir" && chmod 777 "$work_dir"
+  curl -sLo "$work_dir/sing-box" "https://$ARCH.ssss.nyc.mn/sbx"
+  curl -sLo "$work_dir/argo" "https://$ARCH.ssss.nyc.mn/bot"
+  chmod +x "$work_dir/sing-box" "$work_dir/argo"
 
-# 检查系统类型并安装依赖
-if [ -f /etc/alpine-release ]; then
-  echo "[INFO] 检测到 Alpine 系统，安装依赖中..."
-  apk update && apk add curl tar
-else
-  echo "[INFO] 检测到非 Alpine 系统，尝试安装 curl 和 tar..."
-  command -v apt && apt update && apt install -y curl tar || true
-  command -v yum && yum install -y curl tar || true
-fi
+  green "✅ 安装完成"
+}
 
-# 安装 sing-box
-mkdir -p /etc/sing-box
-cd /etc/sing-box || exit 1
-echo "[INFO] 下载 sing-box 中..."
-curl -L -o sing-box.tar.gz https://github.com/SagerNet/sing-box/releases/latest/download/sing-box-linux-amd64.tar.gz
-tar -xzf sing-box.tar.gz
-cp sing-box /usr/local/bin/
-chmod +x /usr/local/bin/sing-box
-
-# 写入配置文件
-cat > /etc/sing-box/config.json <<EOF
+# 生成 sing-box 配置文件
+generate_config() {
+  cat > "$work_dir/config.json" <<EOF
 {
   "log": {
     "level": "info"
@@ -59,6 +66,8 @@ cat > /etc/sing-box/config.json <<EOF
       "type": "socks",
       "listen": "0.0.0.0",
       "listen_port": $PORT,
+      "sniff": true,
+      "set_system_proxy": false,
       "users": [
         {
           "username": "$USERNAME",
@@ -74,24 +83,60 @@ cat > /etc/sing-box/config.json <<EOF
   ]
 }
 EOF
+}
 
-# 配置 OpenRC 服务
-if [ -f /etc/alpine-release ]; then
-  echo "[INFO] 安装 OpenRC 服务..."
-  cat > /etc/init.d/sing-box <<'RC'
-#!/sbin/openrc-run
-description="sing-box socks5 service"
-command=/usr/local/bin/sing-box
-command_args="run -c /etc/sing-box/config.json"
-RC
-  chmod +x /etc/init.d/sing-box
-  rc-update add sing-box default
-fi
+# 启动 socks5 服务
+start_singbox() {
+  generate_config
+  nohup "$work_dir/sing-box" run -c "$work_dir/config.json" > "$work_dir/run.log" 2>&1 &
+  sleep 1
+  if pgrep -f "$work_dir/sing-box" > /dev/null; then
+    green "✅ socks5 服务已启动："
+    echo -e "socks5://$USERNAME:$PASSWORD@$(get_realip):$PORT"
+  else
+    red "❌ socks5 启动失败，请检查日志 $work_dir/run.log"
+  fi
+}
 
-# 输出连接信息
-IP=$(curl -s https://ipv4.icanhazip.com || hostname -i | awk '{print $1}')
-echo "✅ 配置已完成，你可以手动运行以下命令启动 Socks5："
-echo "   rc-service sing-box start"
-echo
-echo "🌐 连接链接如下（推荐复制使用）："
-echo "socks5://$USERNAME:$PASSWORD@$IP:$PORT"
+# 一键卸载
+uninstall() {
+  read -rp "是否确认卸载 sing-box？(y/n): " confirm
+  if [[ "$confirm" == "y" ]]; then
+    pkill -f "$work_dir/sing-box"
+    rm -rf "$work_dir"
+    green "✅ 已卸载 sing-box"
+  else
+    yellow "取消卸载"
+  fi
+}
+
+# 主菜单
+main_menu() {
+  echo -e "=============================="
+  echo -e "🎯 socks5 一键安装脚本"
+  echo -e "📌 当前端口: $PORT"
+  echo -e "=============================="
+  echo -e "1. 安装并启动 socks5"
+  echo -e "2. 卸载 sing-box"
+  echo -e "0. 退出"
+  echo -e "=============================="
+  read -rp "请输入选项: " menu
+
+  case "$menu" in
+    1)
+      install_singbox
+      start_singbox
+      ;;
+    2)
+      uninstall
+      ;;
+    0)
+      exit 0
+      ;;
+    *)
+      red "无效的选项"
+      ;;
+  esac
+}
+
+main_menu
