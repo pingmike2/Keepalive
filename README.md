@@ -7,12 +7,20 @@
 
 ----
 
-## VPS版一键无交互脚本 5in1
-vless+reality|vmess+argo|hy2|tuic|socks5
+## VPS版一键无交互脚本Socks5
+socks5
 ```
-PORT=34766 bash <(curl -Ls https://raw.githubusercontent.com/yutian81/Keepalive/main/vps_sb5in1.sh)
+PORT=25410 USERNAME=oneforall PASSWORD=allforone bash <(curl -Ls https://raw.githubusercontent.com/pingmike2/Keepalive/main/sock5.sh)
 ```
 
+卸载
+```
+bash <(curl -Ls https://raw.githubusercontent.com/pingmike2/Keepalive/main/sock5.sh) uninstall
+```
+查看配置
+```
+cat /usr/local/sb/config.json
+```
 ## 测试socks5是否通畅
 运行以下命令，若正确返回服务器ip则节点通畅
 ```
