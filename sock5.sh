@@ -103,10 +103,9 @@ cat > "$CONFIG_FILE" <<EOF
     "tag": "socks-in",
     "listen": "0.0.0.0",
     "listen_port": $PORT,
-    "authentication": "password",
     "users": [{
-      "username": "$USERNAME",
-      "password": "$PASSWORD"
+      "user": "$USERNAME",
+      "pass": "$PASSWORD"
     }]
   }],
   "outbounds": [{
@@ -114,7 +113,6 @@ cat > "$CONFIG_FILE" <<EOF
   }]
 }
 EOF
-
 # ==== 启动服务 ====
 echo "[INFO] 启动 socks5 服务..."
 nohup "$BIN_FILE" run -c "$CONFIG_FILE" > "$LOG_FILE" 2>&1 &
