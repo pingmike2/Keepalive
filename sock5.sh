@@ -1,32 +1,30 @@
 #!/bin/sh
 
-# 自定义配置变量（可修改）
-PORT=10808
-USERNAME="youruser"
-PASSWORD="yourpass"
+# 默认配置（如未传入环境变量则使用这些）
+PORT=${PORT:-10808}
+USERNAME=${USERNAME:-"user"}
+PASSWORD=${PASSWORD:-"pass"}
 
-# 检查系统类型（支持 Alpine / Debian / Ubuntu）
+# 检查系统类型
 if [ -f /etc/alpine-release ]; then
-  echo "检测到 Alpine 系统，安装依赖..."
-  apk update
-  apk add curl tar
+  echo "[INFO] 检测到 Alpine 系统，安装依赖中..."
+  apk update && apk add curl tar
 else
-  echo "检测到非 Alpine 系统，尝试使用 apt/yum 安装依赖..."
+  echo "[INFO] 检测到非 Alpine 系统，尝试安装 curl 和 tar..."
   command -v apt && apt update && apt install -y curl tar || true
   command -v yum && yum install -y curl tar || true
 fi
 
-# 安装 sing-box（Linux x86_64 架构）
+# 安装 sing-box
 mkdir -p /etc/sing-box
 cd /etc/sing-box || exit 1
-
-echo "下载并解压 sing-box..."
+echo "[INFO] 下载 sing-box 中..."
 curl -L -o sing-box.tar.gz https://github.com/SagerNet/sing-box/releases/latest/download/sing-box-linux-amd64.tar.gz
 tar -xzf sing-box.tar.gz
 cp sing-box /usr/local/bin/
 chmod +x /usr/local/bin/sing-box
 
-# 创建配置文件
+# 写入配置文件
 cat > /etc/sing-box/config.json <<EOF
 {
   "log": {
@@ -53,9 +51,9 @@ cat > /etc/sing-box/config.json <<EOF
 }
 EOF
 
-# 创建 rc-service 或 systemd 启动方式
+# 启动服务
 if [ -f /etc/alpine-release ]; then
-  echo "配置 Alpine rc-service ..."
+  echo "[INFO] 使用 OpenRC 启动 sing-box..."
   cat > /etc/init.d/sing-box <<'RC'
 #!/sbin/openrc-run
 description="sing-box socks5 service"
@@ -66,7 +64,7 @@ RC
   rc-update add sing-box
   rc-service sing-box restart
 else
-  echo "配置 systemd 服务 ..."
+  echo "[INFO] 使用 systemd 启动 sing-box..."
   cat > /etc/systemd/system/sing-box.service <<EOF
 [Unit]
 Description=Sing-box Socks5 Service
@@ -86,8 +84,9 @@ EOF
   systemctl restart sing-box
 fi
 
+# 输出提示
 echo "✅ Socks5 启动成功"
-echo "地址: 你的服务器IP"
-echo "端口: $PORT"
-echo "用户名: $USERNAME"
-echo "密码: $PASSWORD"
+echo "📌 IP地址：你的服务器公网 IP"
+echo "📌 端口：$PORT"
+echo "📌 用户名：$USERNAME"
+echo "📌 密码：$PASSWORD"
