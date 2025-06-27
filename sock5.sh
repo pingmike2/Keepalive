@@ -89,7 +89,7 @@ RC
 fi
 
 # 输出连接信息
-IP=$(curl -s https://api.ip.sb/ip || hostname -i | awk '{print $1}')
+IP=$(curl -s https://ipv4.icanhazip.com || hostname -i | awk '{print $1}')
 echo "✅ 配置已完成，你可以手动运行以下命令启动 Socks5："
 echo "   rc-service sing-box start"
 echo
