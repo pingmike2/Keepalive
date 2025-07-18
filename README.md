@@ -41,6 +41,8 @@ curl ip.sb --socks5 用户名:密码@localhost:端口
 echo -e "nameserver 2606:4700:4700::64\nnameserver 2606:4700:4700::6400" | sudo tee /etc/resolv.conf
 
 ```
+---
+
 ### 2. 安装 NAT64 支持
 
 ```bash
@@ -54,6 +56,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/pingmike2/Keepalive/main/nat
 curl -6 http://example.com
 
 ```
+能返回网页代码说明成功.
 
 ❌ 卸载方法
 
@@ -64,5 +67,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/pingmike2/Keepalive/main/nat
 📌 说明
 	•	默认 NAT64 地址为 2001:67c:2960:6464::
 	•	默认网卡为 venet0，如不同请自行修改脚本
+
+---
 
 
