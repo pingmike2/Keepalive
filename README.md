@@ -64,7 +64,7 @@ curl -6 http://example.com
 ❌ 卸载方法
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/jyucoeng/socks5/main/nat64-setup.sh) uninstall
+bash <(curl -Ls https://raw.githubusercontent.com/pingmike2/Keepalive/main/sock5.sh) uninstall
 
 ```
 📌 说明
