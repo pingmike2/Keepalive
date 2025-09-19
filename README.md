@@ -1,21 +1,19 @@
 # 项目说明
-各种保活项目
+ socks5
 
-## Serv00保活直接用老王的项目
+## 老王的保活项目
 - 老王[仓库地址](https://github.com/eooce/Sing-box)  
-> 特点：全自动保活
-
-----
-
-## VPS版一键无交互脚本Socks5
-socks5
+> 特点：全自动保## VPS版一键无交互脚本Socks5  安装/卸载脚本 (同时支持 IPv4 和 IPv6)
+用法
+### 安装：
 ```
-PORT=25410 USERNAME=oneforall PASSWORD=allforone bash <(curl -Ls https://raw.githubusercontent.com/pingmike2/Keepalive/main/sock5.sh)
+PORT=16805 USERNAME=用户名 PASSWORD=密码 bash <(curl -Ls https://raw.githubusercontent.com/jyucoeng/socks5/main/sock5.sh)
 ```
+### 说明：IPv4 使用端口 PORT，IPv6 则使用端口 PORT+1
 
-卸载
+### 卸载:
 ```
-bash <(curl -Ls https://raw.githubusercontent.com/pingmike2/Keepalive/main/sock5.sh) uninstall
+bash <(curl -Ls https://raw.githubusercontent.com/jyucoeng/socks5/main/sock5.sh) uninstall
 ```
 查看配置
 ```
@@ -26,6 +24,10 @@ cat /usr/local/sb/config.json
 ```
 curl ip.sb --socks5 用户名:密码@localhost:端口
 ```
+或者
+ 打开下方网址验证
+
+https://iplau.com/category/ip-detection-tool.html
 
 # 🧩 NAT64 一键配置脚本
 
@@ -46,7 +48,7 @@ echo -e "nameserver 2606:4700:4700::64\nnameserver 2606:4700:4700::6400" | sudo 
 ### 2. 安装 NAT64 支持
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/pingmike2/Keepalive/main/nat64-setup.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/jyucoeng/socks5/main/nat64-setup.sh)
 
 ```
 
@@ -61,7 +63,7 @@ curl -6 http://example.com
 ❌ 卸载方法
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/pingmike2/Keepalive/main/nat64-setup.sh) uninstall
+bash <(curl -fsSL https://raw.githubusercontent.com/jyucoeng/socks5/main/nat64-setup.sh) uninstall
 
 ```
 📌 说明
