@@ -3,17 +3,18 @@
 
 ## 老王的保活项目
 - 老王[仓库地址](https://github.com/eooce/Sing-box)  
-> 特点：全自动保## VPS版一键无交互脚本Socks5  安装/卸载脚本 (同时支持 IPv4 和 IPv6)
+
+> socks5特点：全自动保## VPS版一键无交互脚本Socks5  安装/卸载脚本 (同时支持 IPv4 和 IPv6)
 用法
 ### 安装：
 ```
-PORT=16805 USERNAME=用户名 PASSWORD=密码 bash <(curl -Ls https://raw.githubusercontent.com/jyucoeng/socks5/main/sock5.sh)
+PORT=16805 USERNAME=用户名 PASSWORD=密码 bash <(curl -Ls https://raw.githubusercontent.com/pingmike2/Keepalive/main/sock5.sh)
 ```
 ### 说明：IPv4 使用端口 PORT，IPv6 则使用端口 PORT+1
 
 ### 卸载:
 ```
-bash <(curl -Ls https://raw.githubusercontent.com/jyucoeng/socks5/main/sock5.sh) uninstall
+bash <(curl -Ls https://raw.githubusercontent.com/pingmike2/Keepalive/main/sock5.sh) uninstall
 ```
 查看配置
 ```
