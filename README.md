@@ -7,13 +7,12 @@
 用法
 ### 安装：
 ```
-PORT=16805 USERNAME=用户名 PASSWORD=密码 bash <(curl -Ls https://raw.githubusercontent.com/jyucoeng/socks5/main/sock5.sh)
-```
+PORT=16805 USERNAME=用户名 PASSWORD=密码 bash <(curl -Ls https://raw.githubusercontent.com/pingmike2/Keepalive/main/sock5.sh)
 ### 说明：IPv4 使用端口 PORT，IPv6 则使用端口 PORT+1
 
 ### 卸载:
 ```
-bash <(curl -Ls https://raw.githubusercontent.com/jyucoeng/socks5/main/sock5.sh) uninstall
+bash <(curl -Ls bash <(curl -Ls https://raw.githubusercontent.com/pingmike2/Keepalive/main/sock5.sh) uninstall
 ```
 查看配置
 ```
