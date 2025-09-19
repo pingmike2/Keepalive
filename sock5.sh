@@ -1,11 +1,12 @@
 #!/bin/bash
 
-# sing-box socks5 安装/卸载脚本
+# sing-box socks5 安装/卸载脚本 (支持 IPv4/IPv6 双栈)
 # 用法：
 # 安装：
-#   PORT=16805 USERNAME=oneforall PASSWORD=allforone bash <(curl -Ls https://raw.githubusercontent.com/pingmike2/Keepalive/main/sock5.sh)
+#   PORT=16805 USERNAME=oneforall PASSWORD=allforone bash <(curl -Ls https://raw.githubusercontent.com/jyucoeng/socks5/main/sock5.sh)
+#   说明：监听 0.0.0.0 以确保 IPv4/IPv6 双栈兼容
 # 卸载：
-#   bash <(curl -Ls https://raw.githubusercontent.com/pingmike2/Keepalive/main/sock5.sh) uninstall
+#   bash <(curl -Ls https://raw.githubusercontent.com/jyucoeng/socks5/main/sock5.sh) uninstall
 
 set -euo pipefail
 
@@ -32,7 +33,7 @@ fi
 # ===== 环境变量检查 =====
 if [[ -z "${PORT:-}" || -z "${USERNAME:-}" || -z "${PASSWORD:-}" ]]; then
   echo "[ERROR] 必须设置 PORT、USERNAME、PASSWORD 变量，例如："
-  echo "PORT=16805 USERNAME=oneforall PASSWORD=allforone bash <(curl -Ls https://raw.githubusercontent.com/pingmike2/Keepalive/main/sock5.sh)"
+  echo "PORT=16805 USERNAME=oneforall PASSWORD=allforone bash <(curl -Ls https://raw.githubusercontent.com/jyucoeng/socks5/main/sock5.sh)"
   exit 1
 fi
 
@@ -43,8 +44,9 @@ fi
 
 # ===== 获取公网 IP =====
 echo "[INFO] 获取公网 IP..."
-IP=$(curl -s4 ipv4.ip.sb || curl -s4 ifconfig.me || echo "127.0.0.1")
-echo "[INFO] 公网 IP: $IP"
+IP_V4=$(curl -s4 ipv4.ip.sb || curl -s4 ifconfig.me || echo "127.0.0.1")
+IP_V6=$(curl -s6 ipv6.ip.sb || echo "::1")
+echo "[INFO] 公网 IPv4: $IP_V4, IPv6: $IP_V6"
 
 # ===== 安装依赖 =====
 echo "[INFO] 安装依赖 curl tar unzip file grep ..."
@@ -71,7 +73,6 @@ case "$ARCH" in
   *) echo "[ERROR] 不支持的架构: $ARCH"; exit 1 ;;
 esac
 
-# 兼容 grep 取版本号，避免 grep -P
 SB_VER=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest | grep '"tag_name"' | head -n1 | cut -d '"' -f4)
 if [[ -z "$SB_VER" ]]; then
   echo "[ERROR] 获取 sing-box 版本失败，可能是网络问题。"
@@ -84,7 +85,6 @@ URL="https://github.com/SagerNet/sing-box/releases/download/${SB_VER}/sing-box-$
 echo "[INFO] 下载 sing-box: $URL"
 curl -L --retry 3 --retry-delay 2 -o sb.tar.gz "$URL"
 
-# 验证 gzip 格式
 if ! file sb.tar.gz | grep -q 'gzip compressed'; then
   echo "❌ 下载失败，文件不是有效的 gzip 格式。内容如下："
   head -n 10 sb.tar.gz
@@ -101,19 +101,23 @@ cat > "$CONFIG_FILE" <<EOF
   "log": {
     "level": "info"
   },
-  "inbounds": [{
-    "type": "socks",
-    "tag": "socks-in",
-    "listen": "0.0.0.0",
-    "listen_port": $PORT,
-    "users": [{
-      "username": "$USERNAME",
-      "password": "$PASSWORD"
-    }]
-  }],
-  "outbounds": [{
-    "type": "direct"
-  }]
+  "inbounds": [
+    {
+      "type": "socks",
+      "tag": "socks-in",
+      "listen": "0.0.0.0",
+      "listen_port": $PORT,
+      "users": [{
+        "username": "$USERNAME",
+        "password": "$PASSWORD"
+      }]
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "direct"
+    }
+  ]
 }
 EOF
 
@@ -146,12 +150,25 @@ echo "$LISTEN_INFO"
 
 # ===== 本地连接测试 =====
 echo "[INFO] 测试本地 socks5 代理连接..."
+
+# 测试 IPv4 连接
 if curl -s --socks5-hostname "127.0.0.1:$PORT" -U "$USERNAME:$PASSWORD" http://ip.sb >/dev/null 2>&1; then
-  echo "✅ 本地代理连接测试成功"
+  echo "✅ 本地 IPv4 代理连接测试成功"
 else
-  echo "❌ 本地代理连接测试失败，请检查 sing-box 配置和日志"
+  echo "❌ 本地 IPv4 代理连接测试失败，请检查 sing-box 配置和日志"
   tail -n 20 "$LOG_FILE"
   exit 1
+fi
+
+# 测试 IPv6 连接（如果支持）
+if [[ "$IP_V6" != "::1" ]]; then
+  if curl -s --socks5-hostname "[::1]:$PORT" -U "$USERNAME:$PASSWORD" http://ip.sb >/dev/null 2>&1; then
+    echo "✅ 本地 IPv6 代理连接测试成功"
+  else
+    echo "⚠️ 本地 IPv6 代理连接测试失败，但 IPv4 正常工作"
+  fi
+else
+  echo "⚠️ 系统不支持 IPv6，仅启用 IPv4 代理"
 fi
 
 # ===== 防火墙提示 =====
@@ -159,10 +176,19 @@ echo
 echo "⚠️ 请确保服务器防火墙或云安全组已开放端口 $PORT 的 TCP 入站规则。"
 echo "示例（iptables 放行端口命令）："
 echo "iptables -I INPUT -p tcp --dport $PORT -j ACCEPT"
+echo "ip6tables -I INPUT -p tcp --dport $PORT -j ACCEPT"
 echo
 
 # ===== 输出连接信息 =====
 echo "✅ Socks5 启动成功："
-echo "socks5://$USERNAME:$PASSWORD@$IP:$PORT"
+echo "socks5://$USERNAME:$PASSWORD@$IP_V4:$PORT (IPv4)"
+if [[ "$IP_V6" != "::1" ]]; then
+  echo "socks5://$USERNAME:$PASSWORD@[$IP_V6]:$PORT (IPv6)"
+fi
+echo
+echo "💡 使用说明："
+echo "  - 监听地址: 0.0.0.0:$PORT (支持 IPv4/IPv6 双栈)"
+echo "  - 用户名: $USERNAME"
+echo "  - 密码: $PASSWORD"
 
 exit 0
